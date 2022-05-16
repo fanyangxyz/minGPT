@@ -48,9 +48,11 @@ class Trainer:
         self.device = 'cpu'
         if torch.cuda.is_available():
             self.device = torch.cuda.current_device()
+            # TODO(fyang): read more about the torch distributed package.
             self.model = torch.nn.DataParallel(self.model).to(self.device)
 
     def save_checkpoint(self):
+        # TODO(fyang): this part is confusing.
         # DataParallel wrappers keep raw model object in .module attribute
         raw_model = self.model.module if hasattr(self.model, "module") else self.model
         logger.info("saving %s", self.config.ckpt_path)
@@ -97,6 +99,7 @@ class Trainer:
                             progress = float(self.tokens - config.warmup_tokens) / float(max(1, config.final_tokens - config.warmup_tokens))
                             lr_mult = max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
                         lr = config.learning_rate * lr_mult
+                        # TODO(fyang): check all the keys available in param_group.
                         for param_group in optimizer.param_groups:
                             param_group['lr'] = lr
                     else:
@@ -116,6 +119,7 @@ class Trainer:
         train_loader = DataLoader(
             self.train_dataset,
             shuffle=True,
+            # TODO(fyang): check why this is faster.
             pin_memory=True,
             batch_size=config.batch_size,
             num_workers=config.num_workers

@@ -53,12 +53,14 @@ class CausalSelfAttention(nn.Module):
         self.resid_drop = nn.Dropout(config.resid_pdrop)
         # output projection
         self.proj = nn.Linear(config.n_embd, config.n_embd)
+        # TODO(fyang): why use the _lower_ triangle?
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
                                      .view(1, 1, config.block_size, config.block_size))
         self.n_head = config.n_head
 
     def forward(self, x):
+        # TODO(fyang): is sequence length the same as block size?
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
@@ -115,6 +117,7 @@ class GPT(nn.Module):
         self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
         self.block_size = config.block_size
+        # TODO(fyang): this is interesting. Why not use the default ones?
         self.apply(self._init_weights)
 
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
@@ -132,6 +135,7 @@ class GPT(nn.Module):
             torch.nn.init.ones_(module.weight)
         elif isinstance(module, GPT):
             torch.nn.init.normal_(module.pos_emb, mean=0.0, std=0.02)
+        # TODO(fyang): what if there are ones left uninitialized?
 
     def configure_optimizers(self, train_config):
         """
