@@ -130,3 +130,51 @@ trainer.train()
 # load the state of the best model we've seen based on early stopping
 checkpoint = torch.load('cifar10_model.pt')
 model.load_state_dict(checkpoint)
+
+# to sample we also have to technically "train" a separate model for the first token in the sequence
+# we are going to do so below simply by calculating and normalizing the histogram of the first token
+counts = torch.ones(ncluster) # start counts as 1 not zero, this is called "smoothing"
+rp = torch.randperm(len(train_dataset))
+nest = 5000 # how many images to use for the estimation
+for i in range(nest):
+    a, _ = train_dataset[int(rp[i])]
+    t = a[0].item() # index of first token in the sequence
+    counts[t] += 1
+prob = counts/counts.sum()
+
+%%time
+
+from mingpt.utils import sample
+
+n_samples = 32
+start_pixel = np.random.choice(np.arange(C.size(0)), size=(n_samples, 1), replace=True, p=prob)
+start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
+pixels = sample(model, start_pixel, 32*32-1, temperature=1.0, sample=True, top_k=100)
+
+# for visualization we have to invert the permutation used to produce the pixels
+iperm = torch.argsort(train_dataset.perm)
+
+ncol = 8
+nrow = n_samples // ncol
+plt.figure(figsize=(16, 8))
+for i in range(n_samples):
+    pxi = pixels[i][iperm] # note: undo the encoding permutation
+    plt.subplot(nrow, ncol, i+1)
+    plt.imshow(C[pxi].view(32, 32, 3).numpy().astype(np.uint8))
+    plt.axis('off')
+
+# visualize some of the learned positional embeddings, maybe they contain structure
+plt.figure(figsize=(5, 5))
+nsee = 8*8
+ncol = 8
+nrow = nsee // ncol
+for i in range(nsee):
+    ci = model.pos_emb.data[0, :, i].cpu()
+    zci = torch.cat((torch.tensor([0.0]), ci)) # pre-cat a zero
+    rzci = zci[iperm] # undo the permutation to recover the pixel space of the image
+
+    plt.subplot(nrow, ncol, i+1)
+    plt.imshow(rzci.view(32, 32).numpy())
+    plt.axis('off')
+
+# huh, pretty cool! :P
