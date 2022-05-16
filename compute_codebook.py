@@ -4,10 +4,17 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # pytorch helpfully makes it easy to download datasets, e.g. the common CIFAR-10 https://www.kaggle.com/c/cifar-10
-root = './'
-train_data = torchvision.datasets.CIFAR10(root, train=True, transform=None, target_transform=None, download=True)
-test_data  = torchvision.datasets.CIFAR10(root, train=False, transform=None, target_transform=None, download=True)
-print(len(train_data), len(test_data))
+#root = './'
+#train_data = torchvision.datasets.CIFAR10(root, train=True, transform=None, target_transform=None, download=True)
+#test_data  = torchvision.datasets.CIFAR10(root, train=False, transform=None, target_transform=None, download=True)
+#print(len(train_data), len(test_data))
+
+import os
+from PIL import Image
+#img_dir = '/Users/fanyang/Dropbox/art_data/kelly'
+img_dir = '/Users/fanyang/Dropbox/art_data/calder'
+train_data = [(Image.open(os.path.join(img_dir, path)).resize((32, 32)).convert('RGB'), -1) for path in os.listdir(img_dir)]
+print(len(train_data))
 
 # make deterministic
 from mingpt.utils import set_seed
