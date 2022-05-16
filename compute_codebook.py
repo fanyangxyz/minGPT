@@ -9,6 +9,12 @@ train_data = torchvision.datasets.CIFAR10(root, train=True, transform=None, targ
 test_data  = torchvision.datasets.CIFAR10(root, train=False, transform=None, target_transform=None, download=True)
 print(len(train_data), len(test_data))
 
+# make deterministic
+from mingpt.utils import set_seed
+set_seed(42)
+
+
+# TODO(fyang): this can be improved by a learning approach, e.g. autoencoder.
 # get random 5 pixels per image and stack them all up as rgb values to get half a million random pixels
 pluck_rgb = lambda x: torch.from_numpy(np.array(x)).view(32*32, 3)[torch.randperm(32*32)[:5], :]
 px = torch.cat([pluck_rgb(x) for x, y in train_data], dim=0).float()
@@ -22,12 +28,14 @@ def kmeans(x, ncluster, niter=10):
     for i in range(niter):
         # assign all pixels to the closest codebook element
         a = ((x[:, None, :] - c[None, :, :])**2).sum(-1).argmin(1)
+        # compute the loss as the l2 distance between elements and assigned clusters
+        loss = ((x - torch.stack([c[i] for i in a], dim=0))**2).sum(-1).mean(0)
         # move each codebook element to be the mean of the pixels that assigned to it
         c = torch.stack([x[a==k].mean(0) for k in range(ncluster)])
         # re-assign any poorly positioned codebook elements
         nanix = torch.any(torch.isnan(c), dim=1)
         ndead = nanix.sum().item()
-        print('done step %d/%d, re-initialized %d dead clusters' % (i+1, niter, ndead))
+        print('loss %0.4f, done step %d/%d, re-initialized %d dead clusters' % (loss, i+1, niter, ndead))
         c[nanix] = x[torch.randperm(N)[:ndead]] # re-init dead clusters
     return c
 
