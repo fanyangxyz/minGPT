@@ -56,34 +56,55 @@ class ImageDataset(Dataset):
         return a[:-1], a[1:]
 
 
-def main():
-    # set up logging
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO,
-    )
+def sample_images(model, C, train_dataset, trainer):
+    # load the state of the best model we've seen based on early stopping
+    checkpoint = torch.load('cifar10_model.pt')
+    model.load_state_dict(checkpoint)
 
-    # make deterministic
-    set_seed(42)
+    # to sample we also have to technically "train" a separate model for the first token in the sequence
+    # we are going to do so below simply by calculating and normalizing the
+    # histogram of the first token
+    # start counts as 1 not zero, this is called "smoothing"
+    counts = torch.ones(len(C))
+    rp = torch.randperm(len(train_dataset))
+    nest = 5000  # how many images to use for the estimation
+    for i in range(nest):
+        a, _ = train_dataset[int(rp[i])]
+        t = a[0].item()  # index of first token in the sequence
+        counts[t] += 1
+    prob = counts / counts.sum()
 
-    # pytorch helpfully makes it easy to download datasets, e.g. the common
-    # CIFAR-10 https://www.kaggle.com/c/cifar-10
-    root = './'
-    train_data = torchvision.datasets.CIFAR10(
-        root,
-        train=True,
-        transform=None,
-        target_transform=None,
-        download=True)
-    test_data = torchvision.datasets.CIFAR10(
-        root,
-        train=False,
-        transform=None,
-        target_transform=None,
-        download=True)
-    print(len(train_data), len(test_data))
+    n_samples = 32
+    start_pixel = np.random.choice(
+        np.arange(
+            C.size(0)), size=(
+            n_samples, 1), replace=True, p=prob)
+    start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
+    print('sampling...')
+    pixels = sample(
+        model,
+        start_pixel,
+        32 * 32 - 1,
+        temperature=1.0,
+        sample=True,
+        top_k=100)
 
+    # for visualization we have to invert the permutation used to produce the
+    # pixels
+    iperm = torch.argsort(train_dataset.perm)
+
+    ncol = 8
+    nrow = n_samples // ncol
+    plt.figure(figsize=(16, 8))
+    for i in range(n_samples):
+        pxi = pixels[i][iperm]  # note: undo the encoding permutation
+        plt.subplot(nrow, ncol, i + 1)
+        plt.imshow(C[pxi].view(32, 32, 3).numpy().astype(np.uint8))
+        plt.axis('off')
+    plt.savefig('./sampled.png')
+
+
+def compute_cluster(train_data):
     # get random 5 pixels per image and stack them all up as rgb values to get
     # half a million random pixels
     def pluck_rgb(x): return torch.from_numpy(np.array(x)).view(
@@ -116,6 +137,38 @@ def main():
         plt.axis('off')
         plt.savefig('./coded.png')
 
+    return C
+
+
+def main():
+    # set up logging
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO,
+    )
+
+    # make deterministic
+    set_seed(42)
+
+    # pytorch helpfully makes it easy to download datasets, e.g. the common
+    # CIFAR-10 https://www.kaggle.com/c/cifar-10
+    root = './'
+    train_data = torchvision.datasets.CIFAR10(
+        root,
+        train=True,
+        transform=None,
+        target_transform=None,
+        download=True)
+    test_data = torchvision.datasets.CIFAR10(
+        root,
+        train=False,
+        transform=None,
+        target_transform=None,
+        download=True)
+    print(len(train_data), len(test_data))
+
+    C = compute_cluster(train_data)
     train_dataset = ImageDataset(train_data, C)
     test_dataset = ImageDataset(test_data, C)
     print(train_dataset[0][0])  # one example image flattened out into integers
@@ -145,68 +198,10 @@ def main():
                           ckpt_path='cifar10_model.pt',
                           num_workers=8)
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
-    trainer.train()
+    # print('training...')
+    # trainer.train()
 
-    # load the state of the best model we've seen based on early stopping
-    checkpoint = torch.load('cifar10_model.pt')
-    model.load_state_dict(checkpoint)
-
-    # to sample we also have to technically "train" a separate model for the first token in the sequence
-    # we are going to do so below simply by calculating and normalizing the
-    # histogram of the first token
-    # start counts as 1 not zero, this is called "smoothing"
-    counts = torch.ones(ncluster)
-    rp = torch.randperm(len(train_dataset))
-    nest = 5000  # how many images to use for the estimation
-    for i in range(nest):
-        a, _ = train_dataset[int(rp[i])]
-        t = a[0].item()  # index of first token in the sequence
-        counts[t] += 1
-    prob = counts / counts.sum()
-
-    n_samples = 32
-    start_pixel = np.random.choice(
-        np.arange(
-            C.size(0)), size=(
-            n_samples, 1), replace=True, p=prob)
-    start_pixel = torch.from_numpy(start_pixel).to(trainer.device)
-    pixels = sample(
-        model,
-        start_pixel,
-        32 * 32 - 1,
-        temperature=1.0,
-        sample=True,
-        top_k=100)
-
-    # for visualization we have to invert the permutation used to produce the
-    # pixels
-    iperm = torch.argsort(train_dataset.perm)
-
-    ncol = 8
-    nrow = n_samples // ncol
-    plt.figure(figsize=(16, 8))
-    for i in range(n_samples):
-        pxi = pixels[i][iperm]  # note: undo the encoding permutation
-        plt.subplot(nrow, ncol, i + 1)
-        plt.imshow(C[pxi].view(32, 32, 3).numpy().astype(np.uint8))
-        plt.axis('off')
-        plt.savefig('./sampled.png')
-
-    # visualize some of the learned positional embeddings, maybe they contain
-    # structure
-    plt.figure(figsize=(5, 5))
-    nsee = 8 * 8
-    ncol = 8
-    nrow = nsee // ncol
-    for i in range(nsee):
-        ci = model.pos_emb.data[0, :, i].cpu()
-        zci = torch.cat((torch.tensor([0.0]), ci))  # pre-cat a zero
-        # undo the permutation to recover the pixel space of the image
-        rzci = zci[iperm]
-
-        plt.subplot(nrow, ncol, i + 1)
-        plt.imshow(rzci.view(32, 32).numpy())
-        plt.axis('off')
+    sample_images(model, C, train_dataset, trainer)
 
 
 if __name__ == '__main__':
