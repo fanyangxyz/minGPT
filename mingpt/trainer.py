@@ -5,6 +5,7 @@ so nothing in this file really has anything to do with GPT specifically.
 
 import math
 import logging
+import os
 
 from tqdm import tqdm
 import numpy as np
@@ -30,6 +31,8 @@ class TrainerConfig:
     final_tokens = 260e9 # (at what point we reach 10% of original LR)
     # checkpoint settings
     ckpt_path = None
+    # restore from this checkpoint
+    base_ckpt_path = None
     num_workers = 0 # for DataLoader
 
     def __init__(self, **kwargs):
@@ -43,6 +46,12 @@ class Trainer:
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
         self.config = config
+
+        # load from ckpt if exists
+        if self.config.base_ckpt_path and os.path.exists(self.config.base_ckpt_path):
+            logger.info('restoring from %s', self.config.base_ckpt_path)
+            base_ckpt = torch.load(self.config.base_ckpt_path)
+            self.model.load_state_dict(base_ckpt)
 
         # take over whatever gpus are on the system
         self.device = 'cpu'

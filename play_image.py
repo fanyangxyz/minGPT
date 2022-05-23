@@ -1,6 +1,10 @@
+import sys
+import os
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
+import gflags
 import torch
 import torchvision
 from torch.utils.data import Dataset
@@ -8,6 +12,17 @@ from mingpt.utils import set_seed
 from mingpt.model import GPT, GPTConfig
 from mingpt.trainer import Trainer, TrainerConfig
 from mingpt.utils import sample
+
+
+FLAGS = gflags.FLAGS
+
+gflags.DEFINE_boolean('finetune', False, '')
+gflags.DEFINE_boolean('sample', True, '')
+gflags.DEFINE_boolean('train', True, '')
+gflags.DEFINE_string('base_ckpt_path', 'cifar10_model.pt',
+                     'The checkpoint to restore the model from at the beginning of training.')
+gflags.DEFINE_string('ckpt_path', 'cifar10_model.pt',
+                     'The checkpoint to save to during training, or the one to use during sampling.')
 
 
 def kmeans(x, ncluster, niter=10):
@@ -58,7 +73,7 @@ class ImageDataset(Dataset):
 
 def sample_images(model, C, train_dataset, trainer):
     # load the state of the best model we've seen based on early stopping
-    checkpoint = torch.load('cifar10_model.pt')
+    checkpoint = torch.load(FLAGS.ckpt_path)
     model.load_state_dict(checkpoint)
 
     # to sample we also have to technically "train" a separate model for the first token in the sequence
@@ -69,7 +84,7 @@ def sample_images(model, C, train_dataset, trainer):
     rp = torch.randperm(len(train_dataset))
     nest = 5000  # how many images to use for the estimation
     for i in range(nest):
-        a, _ = train_dataset[int(rp[i])]
+        a, _ = train_dataset[int(rp[i % len(train_dataset)])]
         t = a[0].item()  # index of first token in the sequence
         counts[t] += 1
     prob = counts / counts.sum()
@@ -173,6 +188,18 @@ def main():
     test_dataset = ImageDataset(test_data, C)
     print(train_dataset[0][0])  # one example image flattened out into integers
 
+    if FLAGS.finetune:
+        # overwrite the train/test dataset
+        img_dir = '/Users/fanyang/Dropbox/art_data/calder'
+        train_data = [(Image.open(os.path.join(img_dir, path)).resize(
+            (32, 32)).convert('RGB'), -1) for path in os.listdir(img_dir)]
+        test_data = train_data
+        print(len(train_data))
+
+        train_dataset = ImageDataset(train_data, C)
+        test_dataset = ImageDataset(test_data, C)
+        print(train_dataset[0][0])
+
     # we'll do something a bit smaller
     mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
                       embd_pdrop=0.0, resid_pdrop=0.0, attn_pdrop=0.0,
@@ -195,14 +222,18 @@ def main():
     tconf = TrainerConfig(max_epochs=train_epochs, batch_size=16 * 8, learning_rate=3e-3,
                           betas=(0.9, 0.95), weight_decay=0,
                           lr_decay=True, warmup_tokens=tokens_per_epoch, final_tokens=train_epochs * tokens_per_epoch,
-                          ckpt_path='cifar10_model.pt',
+                          ckpt_path=FLAGS.ckpt_path, base_ckpt_path=FLAGS.base_ckpt_path,
                           num_workers=8)
     trainer = Trainer(model, train_dataset, test_dataset, tconf)
-    # print('training...')
-    # trainer.train()
 
-    sample_images(model, C, train_dataset, trainer)
+    if FLAGS.train:
+        print('training...')
+        trainer.train()
+
+    if FLAGS.sample:
+        sample_images(model, C, train_dataset, trainer)
 
 
 if __name__ == '__main__':
+    FLAGS(sys.argv)
     main()
