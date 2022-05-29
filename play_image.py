@@ -73,7 +73,7 @@ class ImageDataset(Dataset):
 
 def sample_images(model, C, train_dataset, trainer):
     # load the state of the best model we've seen based on early stopping
-    checkpoint = torch.load(FLAGS.ckpt_path)
+    checkpoint = torch.load(FLAGS.ckpt_path, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint)
 
     # to sample we also have to technically "train" a separate model for the first token in the sequence

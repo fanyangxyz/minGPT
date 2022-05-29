@@ -50,7 +50,7 @@ class Trainer:
         # load from ckpt if exists
         if self.config.base_ckpt_path and os.path.exists(self.config.base_ckpt_path):
             logger.info('restoring from %s', self.config.base_ckpt_path)
-            base_ckpt = torch.load(self.config.base_ckpt_path)
+            base_ckpt = torch.load(self.config.base_ckpt_path, map_location={'cuda:0': 'cpu'})
             self.model.load_state_dict(base_ckpt)
 
         # take over whatever gpus are on the system
