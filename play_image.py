@@ -203,7 +203,7 @@ def main():
     # we'll do something a bit smaller
     mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
                       embd_pdrop=0.0, resid_pdrop=0.0, attn_pdrop=0.0,
-                      n_layer=1, n_head=1, n_embd=16)
+                      n_layer=6, n_head=4, n_embd=128)
     model = GPT(mconf)
 
     """
@@ -219,7 +219,7 @@ def main():
     train_epochs = 20  # todo run a bigger model and longer, this is tiny
 
     # initialize a trainer instance and kick off training
-    tconf = TrainerConfig(max_epochs=train_epochs, batch_size=16 * 8, learning_rate=3e-3,
+    tconf = TrainerConfig(max_epochs=train_epochs, batch_size=16 * 4, learning_rate=2e-3,
                           betas=(0.9, 0.95), weight_decay=0,
                           lr_decay=True, warmup_tokens=tokens_per_epoch, final_tokens=train_epochs * tokens_per_epoch,
                           ckpt_path=FLAGS.ckpt_path, base_ckpt_path=FLAGS.base_ckpt_path,
