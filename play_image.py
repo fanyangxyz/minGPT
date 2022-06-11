@@ -219,7 +219,7 @@ def main():
     train_epochs = 20  # todo run a bigger model and longer, this is tiny
 
     # initialize a trainer instance and kick off training
-    tconf = TrainerConfig(max_epochs=train_epochs, batch_size=16 * 4, learning_rate=2e-3,
+    tconf = TrainerConfig(max_epochs=train_epochs, batch_size=16 * 8, learning_rate=3e-3,
                           betas=(0.9, 0.95), weight_decay=0,
                           lr_decay=True, warmup_tokens=tokens_per_epoch, final_tokens=train_epochs * tokens_per_epoch,
                           ckpt_path=FLAGS.ckpt_path, base_ckpt_path=FLAGS.base_ckpt_path,
