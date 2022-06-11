@@ -203,7 +203,7 @@ def main():
     # we'll do something a bit smaller
     mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
                       embd_pdrop=0.0, resid_pdrop=0.0, attn_pdrop=0.0,
-                      n_layer=6, n_head=4, n_embd=128)
+                      n_layer=12, n_head=8, n_embd=256)
     model = GPT(mconf)
 
     """
