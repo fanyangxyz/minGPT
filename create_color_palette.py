@@ -60,21 +60,23 @@ def main():
     cropped = array[thm:-bhm, lwm:-rwm, :]
     os.makedirs('images/', exist_ok=True)
     os.makedirs('palettes/', exist_ok=True)
-    os.makedirs('palettes_hsv/', exist_ok=True)
+    # os.makedirs('palettes_hsv/', exist_ok=True)
     size = 160
     for i in range(32):
         r, c = divmod(i, 8)
         image = cropped[r * size:(r + 1) * size, c * size:(c + 1) * size, :]
         Image.fromarray(image).save(f'images/image_{i}.png')
         nc = 4
-        image = rgb_to_hsv(image)
+        # image = rgb_to_hsv(image)
         C = kmeans(torch.Tensor(image).view(-1, 3), nc**2, niter=20).numpy()
-        C = hsv_to_rgb(C)
+        # C = hsv_to_rgb(C)
         C = np.rint(C).astype(np.uint8)
         C = sorted(C, key=lambda x: x[0])
-        # Image.fromarray(np.reshape(C, (nc, nc, 3))).save(f'palettes/palette_{i}.png')
-        Image.fromarray(np.reshape(C, (nc, nc, 3))).save(
-            f'palettes_hsv/palette_{i}.png')
+        with open(f'palettes/palette_{i}.npy', 'wb') as f:
+            np.save(f, C)
+        Image.fromarray(np.reshape(C, (nc, nc, 3))).save(f'palettes/palette_{i}.png')
+        # Image.fromarray(np.reshape(C, (nc, nc, 3))).save(
+        #     f'palettes_hsv/palette_{i}.png')
         # break
 
 
